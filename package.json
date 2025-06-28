@@ -1,7 +1,7 @@
 {
-  "name": "@andresaya/edge-tts",
-  "version": "1.2.4",
-  "description": "Edge TTS is a package that allows access to the online text-to-speech service used by Microsoft Edge without the need for Microsoft Edge, Windows, or an API key.",
+  "name": "@duyquangnvx/edge-tts",
+  "version": "2.0.0",
+  "description": "Enhanced Edge TTS package with improved API design, TypeScript support, and comprehensive testing. Forked from @andresaya/edge-tts with significant improvements including SynthesisResult pattern, better error handling, and full unit test coverage.",
   "main": "dist/index.js",
   "keywords": [
     "edge",
@@ -9,20 +9,40 @@
     "text-to-speech",
     "microsoft",
     "microsoft edge",
-    "speech-synthesis"
+    "speech-synthesis",
+    "enhanced",
+    "typescript",
+    "synthesis-result",
+    "improved-api"
   ],
-  "author": "Andres Aya",
+  "author": {
+    "name": "Vu Duy Quang",
+    "email": "duyquangnvx@gmail.com",
+    "url": "https://github.com/duyquangnvx"
+  },
+  "contributors": [
+    {
+      "name": "Andres Aya",
+      "url": "https://github.com/andresayac",
+      "role": "Original Author"
+    }
+  ],
   "license": "GPL-3.0-only",
-  "homepage": "https://github.com/andresayac/edge-tts",
+  "homepage": "https://github.com/duyquangnvx/edge-tts",
   "bugs": {
-    "url": "https://github.com/andresayac/edge-tts/issues"
+    "url": "https://github.com/duyquangnvx/edge-tts/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/duyquangnvx/edge-tts.git"
   },
   "scripts": {
     "build": "tsc",
     "build:bin": "bun scripts/build.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "release": "npm publish --access=public"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -46,6 +66,7 @@
     "edge-tts": "./dist/cli/edge-tts.js"
   },
   "engines": {
-    "bun": ">=0.5.0"
+    "bun": ">=0.5.0",
+    "node": ">=16.0.0"
   }
 }

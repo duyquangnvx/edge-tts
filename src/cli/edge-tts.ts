@@ -7,13 +7,15 @@ import { Command } from 'commander';
 const program = new Command();
 
 program
-  .version('1.2.4')
-  .addCommand(SynthesizeCommand)
-  .addCommand(VoiceListCommand);
+    .name('edge-tts')
+    .description('Enhanced Edge TTS - Text-to-Speech using Microsoft Edge with improved API')
+    .version('2.0.0')
+    .addCommand(SynthesizeCommand)
+    .addCommand(VoiceListCommand);
 
 try {
-  program.parse();
+    program.parse();
 } catch (error) {
-  console.error(`Error: ${(error as Error).message}`);
-  process.exit(1);
+    console.error(`Error: ${(error as Error).message}`);
+    process.exit(1);
 }
