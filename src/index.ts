@@ -1,2 +1,3 @@
 export { EdgeTTS } from './services/EdgeTTS';
-export type { SynthesisResult, SynthesisOptions, EdgeTTSVoice, EdgeTTSGender } from './types';
+export { EdgeTTSGender } from './types';
+export type { SynthesisResult, SynthesisOptions, EdgeTTSVoice } from './types';

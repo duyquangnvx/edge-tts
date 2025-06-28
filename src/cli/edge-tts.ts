@@ -9,7 +9,7 @@ const program = new Command();
 program
     .name('edge-tts')
     .description('Enhanced Edge TTS - Text-to-Speech using Microsoft Edge with improved API')
-    .version('2.0.0')
+    .version('2.0.2')
     .addCommand(SynthesizeCommand)
     .addCommand(VoiceListCommand);
 
