@@ -44,6 +44,7 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
+    "examples": "npm run build && node dist/examples.js",
     "prepublishOnly": "npm run test && npm run build",
     "release": "npm publish --access=public"
   },
