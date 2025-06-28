@@ -1,68 +1,82 @@
 import WebSocket from 'ws';
 import { Constants } from '../config/constants';
+import type { EdgeTTSVoice, SynthesisOptions } from '../types';
 import { writeFileSync } from 'fs';
 
 export class EdgeTTS {
-    private audio_stream: any[] = [];
-    private audio_format: string = 'mp3';
-    private ws!: WebSocket;
+    private audioStream: Buffer[] = [];
+    private readonly audioFormat: string = 'mp3';
+    private ws: WebSocket | null = null;
 
-    async getVoices(): Promise<any[]> {
-        const response = await fetch(`${Constants.VOICES_URL}?trustedclienttoken=${Constants.TRUSTED_CLIENT_TOKEN}`);
-        const data = await response.json();
-        return data.map((voice: any) => {
-            delete voice.VoiceTag;
-            delete voice.SuggestedCodec;
-            delete voice.Status;
-            return voice;
-        });
+    async getVoices(): Promise<EdgeTTSVoice[]> {
+        const response = await fetch(
+            `${Constants.VOICES_URL}?trustedclienttoken=${Constants.TRUSTED_CLIENT_TOKEN}`
+        );
+        const voices: EdgeTTSVoice[] = await response.json();
+
+        return voices.map(voice => ({
+            Name: voice.Name,
+            DisplayName: voice.DisplayName,
+            ShortName: voice.ShortName,
+            Gender: voice.Gender,
+            Locale: voice.Locale,
+            VoiceType: voice.VoiceType,
+        }));
     }
 
     private generateUUID(): string {
-        return 'xxxxxxxx-xxxx-xxxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
+        return 'xxxxxxxx-xxxx-xxxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+            const random = Math.random() * 16 | 0;
+            const value = char === 'x' ? random : (random & 0x3 | 0x8);
+            return value.toString(16);
         });
     }
 
-    private validatePitch(pitch: string): string {
-        if (!/^(-?\d{1,3}Hz)$/.test(pitch)) {
-            throw new Error("Invalid pitch format. Expected format: '-100Hz to 100Hz'.");
+    private validatePitch(pitch: number): number {
+        if (!Number.isInteger(pitch) || pitch < -100 || pitch > 100) {
+            throw new Error("Invalid pitch value. Expected integer between -100 and 100 Hz.");
         }
         return pitch;
     }
 
-    private validateRate(rate: string): string {
-        if (!/^(-?\d{1,3}%)$/.test(rate)) {
-            throw new Error("Invalid rate format. Expected format: '-100% to 100%'.");
+    private validateRate(rate: number): number {
+        if (!Number.isInteger(rate) || rate < -100 || rate > 100) {
+            throw new Error("Invalid rate value. Expected integer between -100 and 100%.");
         }
         return rate;
     }
 
-    private validateVolume(volume: string): string {
-        if (!/^(-?\d{1,3}%)$/.test(volume)) {
-            throw new Error("Invalid volume format. Expected format: '-100% to 100%'.");
+    private validateVolume(volume: number): number {
+        if (!Number.isInteger(volume) || volume < -100 || volume > 100) {
+            throw new Error("Invalid volume value. Expected integer between -100 and 100%.");
         }
         return volume;
     }
 
-    async synthesize(text: string, voice: string = 'en-US-AnaNeural', options: any = {}): Promise<void> {
+    async synthesize(
+        text: string,
+        voice: string = 'en-US-AnaNeural',
+        options: SynthesisOptions = {}
+    ): Promise<void> {
         return new Promise((resolve, reject) => {
-            const req_id = this.generateUUID();
-            this.ws = new WebSocket(`${Constants.WSS_URL}?trustedclienttoken=${Constants.TRUSTED_CLIENT_TOKEN}&ConnectionId=${req_id}`);
+            const requestId = this.generateUUID();
+            this.ws = new WebSocket(
+                `${Constants.WSS_URL}?trustedclienttoken=${Constants.TRUSTED_CLIENT_TOKEN}&ConnectionId=${requestId}`
+            );
 
-            const SSML_text = this.getSSML(text, voice, options);
+            const ssmlText = this.getSSML(text, voice, options);
 
             this.ws.on('open', () => {
-                const message = this.buildTTSConfigMessage();
-                this.ws.send(message);
+                if (!this.ws) return;
 
-                const speechMessage = `X-RequestId:${req_id}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${new Date().toISOString()}Z\r\nPath:ssml\r\n\r\n${SSML_text}`;
+                const configMessage = this.buildTTSConfigMessage();
+                this.ws.send(configMessage);
+
+                const speechMessage = this.buildSpeechMessage(requestId, ssmlText);
                 this.ws.send(speechMessage);
             });
 
-            this.ws.on('message', (data) => {
+            this.ws.on('message', (data: Buffer) => {
                 this.processAudioData(data);
             });
 
@@ -70,67 +84,89 @@ export class EdgeTTS {
                 resolve();
             });
 
-            this.ws.on('error', (err) => {
-                reject(err);
+            this.ws.on('error', (error: Error) => {
+                reject(error);
             });
         });
     }
 
-    private getSSML(text: string, voice: string, options: any = {}): string {
-        options.pitch = options.pitch.replace('hz', 'Hz');
-        const pitch = this.validatePitch(options.pitch || '0Hz');
-        const rate = this.validateRate(options.rate || '0%');
-        const volume = this.validateVolume(options.volume || '0%');
+    private getSSML(text: string, voice: string, options: SynthesisOptions): string {
+        const pitch = this.validatePitch(options.pitch ?? 0);
+        const rate = this.validateRate(options.rate ?? 0);
+        const volume = this.validateVolume(options.volume ?? 0);
 
-        return `<speak version='1.0' xml:lang='en-US'><voice name='${voice}'><prosody pitch='${pitch}' rate='${rate}' volume='${volume}'>${text}</prosody></voice></speak>`;
+        return `<speak version='1.0' xml:lang='en-US'>
+      <voice name='${voice}'>
+        <prosody pitch='${pitch}Hz' rate='${rate}%' volume='${volume}%'>
+          ${text}
+        </prosody>
+      </voice>
+    </speak>`;
     }
 
     private buildTTSConfigMessage(): string {
-        return `X-Timestamp:${new Date().toISOString()}Z\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
-            `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":true},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`;
+        const timestamp = new Date().toISOString() + 'Z';
+        return `X-Timestamp:${timestamp}\r\n` +
+            `Content-Type:application/json; charset=utf-8\r\n` +
+            `Path:speech.config\r\n\r\n` +
+            JSON.stringify({
+                context: {
+                    synthesis: {
+                        audio: {
+                            metadataoptions: {
+                                sentenceBoundaryEnabled: false,
+                                wordBoundaryEnabled: true
+                            },
+                            outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+                        }
+                    }
+                }
+            });
     }
 
-    private processAudioData(data: any): void {
-        if (Buffer.isBuffer(data)) {
-            const needle = Buffer.from("Path:audio\r\n");
+    private buildSpeechMessage(requestId: string, ssmlText: string): string {
+        const timestamp = new Date().toISOString() + 'Z';
+        return `X-RequestId:${requestId}\r\n` +
+            `Content-Type:application/ssml+xml\r\n` +
+            `X-Timestamp:${timestamp}\r\n` +
+            `Path:ssml\r\n\r\n${ssmlText}`;
+    }
 
-            const uint8Data = new Uint8Array(data);
-            const start_ind = uint8Data.indexOf(needle[0]);
+    private processAudioData(data: Buffer): void {
+        const needle = Buffer.from('Path:audio\r\n');
+        const uint8Data = new Uint8Array(data);
+        const startIndex = uint8Data.indexOf(needle[0]);
 
-            if (start_ind !== -1) {
-                const audioData = data.subarray(start_ind + needle.length);
-                this.audio_stream.push(audioData);
-            }
+        if (startIndex !== -1) {
+            const audioData = data.subarray(startIndex + needle.length);
+            this.audioStream.push(audioData);
+        }
 
-            if (data.includes("Path:turn.end")) {
-                this.ws.close();
-            }
+        if (data.includes('Path:turn.end')) {
+            this.ws?.close();
         }
     }
-
-
 
     async toFile(outputPath: string): Promise<void> {
-        if (this.audio_stream.length) {
-            const audioBuffer = Buffer.concat(this.audio_stream);
-            const uint8Array = new Uint8Array(audioBuffer);
-            writeFileSync(`${outputPath}.${this.audio_format}`, uint8Array);
-        } else {
-            throw new Error("No audio data available to save.");
-        }
-    }
-
-    toRaw(): string {
-        if (this.audio_stream.length === 0) {
-            throw new Error("No audio data available.");
+        if (this.audioStream.length === 0) {
+            throw new Error('No audio data available to save.');
         }
 
-        const audioBuffer = Buffer.concat(this.audio_stream);
-        return audioBuffer.toString('base64');
+        const audioBuffer = Buffer.concat(this.audioStream);
+        writeFileSync(`${outputPath}.${this.audioFormat}`, audioBuffer);
     }
 
     toBase64(): string {
-        const audioBuffer = Buffer.concat(this.audio_stream);
+        if (this.audioStream.length === 0) {
+            throw new Error('No audio data available.');
+        }
+
+        const audioBuffer = Buffer.concat(this.audioStream);
         return audioBuffer.toString('base64');
+    }
+
+    // Deprecated: toRaw is identical to toBase64
+    toRaw(): string {
+        return this.toBase64();
     }
 }
