@@ -56,24 +56,35 @@ const voices = await tts.getVoices();
 console.log(voices);  // Display available voices
 
 // Synthesize text with options for voice, rate, volume, and pitch
-await tts.synthesize("Hello, world!", 'en-US-AriaNeural', {
-    rate: '0%',       // Speech rate (range: -100% to 100%)
-    volume: '0%',     // Speech volume (range: -100% to 100%)
-    pitch: '0Hz'      // Voice pitch (range: -100Hz to 100Hz)
+// NEW API: synthesize() now returns a SynthesisResult object
+const result = await tts.synthesize("Hello, world!", 'en-US-AriaNeural', {
+    rate: 0,          // Speech rate (range: -100 to 100)
+    volume: 0,        // Speech volume (range: -100 to 100)
+    pitch: 0          // Voice pitch (range: -100 to 100)
 });
 
-// Export synthesized audio in different formats
-tts.toBase64();   // Get audio as base64
-await tts.toFile("output_audio");       // Save audio to file
-await tts.toRaw();         // Get raw audio buffer
+// Export synthesized audio using result methods
+const base64Audio = result.toBase64();   // Get audio as base64
+await result.toFile("output_audio");     // Save audio to file
+const rawAudio = result.toRaw();         // Get raw audio buffer (same as base64)
+
+// Additional result methods
+const audioBuffer = result.getBuffer();  // Get Buffer directly
+const audioSize = result.getSize();      // Get audio size in bytes
+const audioFormat = result.getFormat();  // Get audio format (mp3)
+
+console.log(`Generated audio: ${audioSize} bytes, format: ${audioFormat}`);
 ```
 
 ## Export Options
-After synthesizing speech, you can export the audio in various formats:
+The `SynthesisResult` object provides various methods to work with the generated audio:
 
-- `toBase64`: Returns the audio as a Base64 string.
-- `toFile`: Saves the audio to a specified file (e.g., "output.wav").
-- `toRaw`: Returns the raw audio stream.
+- `toBase64()`: Returns the audio as a Base64 string.
+- `toFile(outputPath)`: Saves the audio to a specified file (automatically adds .mp3 extension).
+- `toRaw()`: Returns the raw audio buffer (identical to toBase64()).
+- `getBuffer()`: Returns the Buffer object directly for advanced manipulation.
+- `getSize()`: Returns the audio size in bytes.
+- `getFormat()`: Returns the audio format (currently 'mp3').
 
 ## PHP Version
 If you want to use Edge TTS with PHP, you can check out the PHP version of this package, [Edge TTS PHP](https://github.com/andresayac/edge-tts-php)

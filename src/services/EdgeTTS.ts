@@ -1,12 +1,50 @@
 import WebSocket from 'ws';
 import { Constants } from '../config/constants';
-import type { EdgeTTSVoice, SynthesisOptions } from '../types';
+import type { EdgeTTSVoice, SynthesisOptions, SynthesisResult } from '../types';
 import { writeFileSync } from 'fs';
 
+class SynthesisResultImpl implements SynthesisResult {
+    private readonly audioBuffer: Buffer;
+    private readonly audioFormat: string;
+
+    constructor(audioData: Buffer[], audioFormat: string = 'mp3') {
+        this.audioBuffer = Buffer.concat(audioData);
+        this.audioFormat = audioFormat;
+    }
+
+    toBase64(): string {
+        if (this.audioBuffer.length === 0) {
+            throw new Error('No audio data available.');
+        }
+        return this.audioBuffer.toString('base64');
+    }
+
+    async toFile(outputPath: string): Promise<void> {
+        if (this.audioBuffer.length === 0) {
+            throw new Error('No audio data available to save.');
+        }
+        writeFileSync(`${outputPath}.${this.audioFormat}`, this.audioBuffer);
+    }
+
+    toRaw(): string {
+        return this.toBase64();
+    }
+
+    getBuffer(): Buffer {
+        return this.audioBuffer;
+    }
+
+    getFormat(): string {
+        return this.audioFormat;
+    }
+
+    getSize(): number {
+        return this.audioBuffer.length;
+    }
+}
+
 export class EdgeTTS {
-    private audioStream: Buffer[] = [];
     private readonly audioFormat: string = 'mp3';
-    private ws: WebSocket | null = null;
 
     async getVoices(): Promise<EdgeTTSVoice[]> {
         const response = await fetch(
@@ -53,38 +91,45 @@ export class EdgeTTS {
         return volume;
     }
 
+    /**
+     * Synthesize text to speech and return a result object with audio manipulation methods
+     * @param text - Text to synthesize
+     * @param voice - Voice to use for synthesis
+     * @param options - Synthesis options (pitch, rate, volume)
+     * @returns SynthesisResult object with audio data and methods
+     */
     async synthesize(
         text: string,
         voice: string = 'en-US-AnaNeural',
         options: SynthesisOptions = {}
-    ): Promise<void> {
+    ): Promise<SynthesisResult> {
         return new Promise((resolve, reject) => {
+            const audioStream: Buffer[] = [];
             const requestId = this.generateUUID();
-            this.ws = new WebSocket(
+            const ws = new WebSocket(
                 `${Constants.WSS_URL}?trustedclienttoken=${Constants.TRUSTED_CLIENT_TOKEN}&ConnectionId=${requestId}`
             );
 
             const ssmlText = this.getSSML(text, voice, options);
 
-            this.ws.on('open', () => {
-                if (!this.ws) return;
-
+            ws.on('open', () => {
                 const configMessage = this.buildTTSConfigMessage();
-                this.ws.send(configMessage);
+                ws.send(configMessage);
 
                 const speechMessage = this.buildSpeechMessage(requestId, ssmlText);
-                this.ws.send(speechMessage);
+                ws.send(speechMessage);
             });
 
-            this.ws.on('message', (data: Buffer) => {
-                this.processAudioData(data);
+            ws.on('message', (data: Buffer) => {
+                this.processAudioData(data, audioStream, ws);
             });
 
-            this.ws.on('close', () => {
-                resolve();
+            ws.on('close', () => {
+                const result = new SynthesisResultImpl(audioStream, this.audioFormat);
+                resolve(result);
             });
 
-            this.ws.on('error', (error: Error) => {
+            ws.on('error', (error: Error) => {
                 reject(error);
             });
         });
@@ -132,41 +177,40 @@ export class EdgeTTS {
             `Path:ssml\r\n\r\n${ssmlText}`;
     }
 
-    private processAudioData(data: Buffer): void {
+    private processAudioData(data: Buffer, audioStream: Buffer[], ws: WebSocket): void {
         const needle = Buffer.from('Path:audio\r\n');
         const uint8Data = new Uint8Array(data);
         const startIndex = uint8Data.indexOf(needle[0]);
 
         if (startIndex !== -1) {
             const audioData = data.subarray(startIndex + needle.length);
-            this.audioStream.push(audioData);
+            audioStream.push(audioData);
         }
 
         if (data.includes('Path:turn.end')) {
-            this.ws?.close();
+            ws.close();
         }
     }
 
+    // Deprecated methods - kept for backward compatibility
+    /**
+     * @deprecated Use synthesize().then(result => result.toFile(outputPath)) instead
+     */
     async toFile(outputPath: string): Promise<void> {
-        if (this.audioStream.length === 0) {
-            throw new Error('No audio data available to save.');
-        }
-
-        const audioBuffer = Buffer.concat(this.audioStream);
-        writeFileSync(`${outputPath}.${this.audioFormat}`, audioBuffer);
+        throw new Error('Method toFile() is deprecated. Use synthesize().then(result => result.toFile(outputPath)) instead.');
     }
 
+    /**
+     * @deprecated Use synthesize().then(result => result.toBase64()) instead
+     */
     toBase64(): string {
-        if (this.audioStream.length === 0) {
-            throw new Error('No audio data available.');
-        }
-
-        const audioBuffer = Buffer.concat(this.audioStream);
-        return audioBuffer.toString('base64');
+        throw new Error('Method toBase64() is deprecated. Use synthesize().then(result => result.toBase64()) instead.');
     }
 
-    // Deprecated: toRaw is identical to toBase64
+    /**
+     * @deprecated Use synthesize().then(result => result.toRaw()) instead
+     */
     toRaw(): string {
-        return this.toBase64();
+        throw new Error('Method toRaw() is deprecated. Use synthesize().then(result => result.toRaw()) instead.');
     }
 }

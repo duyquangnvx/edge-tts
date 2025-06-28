@@ -17,8 +17,24 @@ export const SynthesizeCommand = new Command('synthesize')
       process.exit(1);
     }
 
-    const tts = new EdgeTTS();
-    await tts.synthesize(text, voice, { pitch, rate, volume });
-    await tts.toFile(`${output}`);
-    console.log(`Audio file generated: ${output}.mp3`);
+    try {
+      const tts = new EdgeTTS();
+      
+      // Use new API: synthesize returns SynthesisResult
+      const result = await tts.synthesize(text, voice, { 
+        pitch: parseInt(pitch) || 0, 
+        rate: parseInt(rate) || 0, 
+        volume: parseInt(volume) || 0 
+      });
+      
+      // Use result methods instead of EdgeTTS instance methods
+      await result.toFile(`${output}`);
+      
+      console.log(`Audio file generated: ${output}.mp3`);
+      console.log(`File size: ${result.getSize()} bytes`);
+      console.log(`Audio format: ${result.getFormat()}`);
+    } catch (error) {
+      console.error(`Error during synthesis: ${(error as Error).message}`);
+      process.exit(1);
+    }
   });
