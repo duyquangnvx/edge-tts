@@ -1,6 +1,6 @@
 {
   "name": "@duyquangnvx/edge-tts",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Enhanced Edge TTS package with improved API design, TypeScript support, and comprehensive testing. Forked from @andresaya/edge-tts with significant improvements including SynthesisResult pattern, better error handling, and full unit test coverage.",
   "main": "dist/index.js",
   "keywords": [
@@ -39,9 +39,12 @@
   "scripts": {
     "build": "tsc",
     "build:bin": "bun scripts/build.ts",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
+    "prepublishOnly": "npm run test && npm run build",
     "release": "npm publish --access=public"
   },
   "devDependencies": {
