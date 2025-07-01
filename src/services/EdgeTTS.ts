@@ -1,15 +1,13 @@
 import WebSocket from 'ws';
-import { Constants } from '../config/constants';
-import type { EdgeTTSVoice, SynthesisOptions, SynthesisResult } from '../types';
+import { AUDIO_EXTENSION, AUDIO_FORMAT, AUDIO_METADATA, Constants } from '../config/constants';
+import type { AudioMetadata, EdgeTTSVoice, SynthesisOptions, SynthesisResult } from '../types';
 import { writeFileSync } from 'fs';
 
 class SynthesisResultImpl implements SynthesisResult {
     private readonly audioBuffer: Buffer;
-    private readonly audioFormat: string;
 
-    constructor(audioData: Buffer[], audioFormat: string = 'mp3') {
+    constructor(audioData: Buffer[]) {
         this.audioBuffer = Buffer.concat(audioData);
-        this.audioFormat = audioFormat;
     }
 
     toBase64(): string {
@@ -23,7 +21,12 @@ class SynthesisResultImpl implements SynthesisResult {
         if (this.audioBuffer.length === 0) {
             throw new Error('No audio data available to save.');
         }
-        writeFileSync(`${outputPath}.${this.audioFormat}`, this.audioBuffer);
+
+        if (outputPath.endsWith(AUDIO_EXTENSION)) {
+            writeFileSync(outputPath, this.audioBuffer);
+        } else {
+            writeFileSync(`${outputPath}${this.getExtension()}`, this.audioBuffer);
+        }
     }
 
     toRaw(): string {
@@ -35,7 +38,15 @@ class SynthesisResultImpl implements SynthesisResult {
     }
 
     getFormat(): string {
-        return this.audioFormat;
+        return AUDIO_FORMAT;
+    }
+
+    getExtension(): string {
+        return AUDIO_EXTENSION;
+    }
+
+    getMetadata(): AudioMetadata {
+        return AUDIO_METADATA;
     }
 
     getSize(): number {
@@ -44,8 +55,6 @@ class SynthesisResultImpl implements SynthesisResult {
 }
 
 export class EdgeTTS {
-    private readonly audioFormat: string = 'mp3';
-
     async getVoices(): Promise<EdgeTTSVoice[]> {
         const response = await fetch(
             `${Constants.VOICES_URL}?trustedclienttoken=${Constants.TRUSTED_CLIENT_TOKEN}`
@@ -125,7 +134,7 @@ export class EdgeTTS {
             });
 
             ws.on('close', () => {
-                const result = new SynthesisResultImpl(audioStream, this.audioFormat);
+                const result = new SynthesisResultImpl(audioStream);
                 resolve(result);
             });
 
@@ -150,6 +159,7 @@ export class EdgeTTS {
     }
 
     private buildTTSConfigMessage(): string {
+        const audioFormat = AUDIO_FORMAT;
         const timestamp = new Date().toISOString() + 'Z';
         return `X-Timestamp:${timestamp}\r\n` +
             `Content-Type:application/json; charset=utf-8\r\n` +
@@ -162,7 +172,7 @@ export class EdgeTTS {
                                 sentenceBoundaryEnabled: false,
                                 wordBoundaryEnabled: true
                             },
-                            outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+                            outputFormat: audioFormat
                         }
                     }
                 }
@@ -179,12 +189,15 @@ export class EdgeTTS {
 
     private processAudioData(data: Buffer, audioStream: Buffer[], ws: WebSocket): void {
         const needle = Buffer.from('Path:audio\r\n');
-        const uint8Data = new Uint8Array(data);
-        const startIndex = uint8Data.indexOf(needle[0]);
+        
+        const startIndex = data.indexOf(needle);
 
         if (startIndex !== -1) {
             const audioData = data.subarray(startIndex + needle.length);
-            audioStream.push(audioData);
+            
+            if (audioData.length > 0) {
+                audioStream.push(audioData);
+            }
         }
 
         if (data.includes('Path:turn.end')) {

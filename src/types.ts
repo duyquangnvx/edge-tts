@@ -19,6 +19,13 @@ export interface SynthesisOptions {
     volume?: number; // Percentage, -100 to 100
 }
 
+export interface AudioMetadata {
+    format: string;
+    bitrate: string;
+    sampleRate: number;
+    channels: number;
+}
+
 export interface SynthesisResult {
     /**
      * Convert audio data to Base64 string
@@ -46,6 +53,11 @@ export interface SynthesisResult {
      * Get audio format
      */
     getFormat(): string;
+
+    /**
+     * Get audio metadata
+     */
+    getMetadata(): AudioMetadata;
     
     /**
      * Get audio size in bytes

@@ -1,6 +1,6 @@
 {
   "name": "@duyquangnvx/edge-tts",
-  "version": "2.0.2",
+  "version": "2.0.9",
   "description": "Enhanced Edge TTS package with improved API design, TypeScript support, and comprehensive testing. Forked from @andresaya/edge-tts with significant improvements including SynthesisResult pattern, better error handling, and full unit test coverage.",
   "main": "dist/index.js",
   "keywords": [
