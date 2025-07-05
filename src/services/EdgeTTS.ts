@@ -87,7 +87,7 @@ export class EdgeTTS {
     }
 
     private validateRate(rate: number): number {
-        if (!Number.isInteger(rate) || rate < -100 || rate > 100) {
+        if (isNaN(rate) || rate < -100 || rate > 100) {
             throw new Error("Invalid rate value. Expected integer between -100 and 100%.");
         }
         return rate;
