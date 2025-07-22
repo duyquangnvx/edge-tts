@@ -1,3 +1,4 @@
+import fetch from 'node-fetch';
 import WebSocket from 'ws';
 import { AUDIO_EXTENSION, AUDIO_FORMAT, AUDIO_METADATA, Constants } from '../config/constants';
 import type { AudioMetadata, EdgeTTSVoice, SynthesisOptions, SynthesisResult } from '../types';

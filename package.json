@@ -58,7 +58,8 @@
     "commander": "^12.1.0",
     "events": "^3.3.0",
     "fs": "^0.0.1-security",
-    "ws": "^8.18.2"
+    "ws": "^8.18.2",
+    "node-fetch": "^3.3.2"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
